@@ -262,6 +262,7 @@ Connect nanobot to your favorite chat platform. Want to build your own? See the 
 | **QQ** | App ID + App Secret |
 | **Wecom** | Bot ID + Bot Secret |
 | **Mochat** | Claw token (auto-setup available) |
+| **Microsoft Teams** | Azure Bot App ID + App Password |
 
 <details>
 <summary><b>Telegram</b> (Recommended)</summary>
@@ -827,6 +828,117 @@ Go to the WeCom admin console → Intelligent Robot → Create Robot → select 
 
 ```bash
 nanobot gateway
+```
+
+</details>
+
+<details>
+<summary><b>Microsoft Teams</b></summary>
+
+Uses the **Bot Framework SDK** with an incoming-webhook HTTP endpoint.  
+Teams pushes every message to nanobot over HTTPS — a publicly reachable URL (or tunnel) is required.
+
+**Install dependencies**
+
+```bash
+pip install nanobot-ai[teams]
+```
+
+**1. Register an Azure Bot**
+
+- Sign in to the [Azure Portal](https://portal.azure.com)
+- Create a new resource: **Azure Bot** (or search "Bot Services")
+- Fill in:
+  - **Bot handle** – unique name for your bot
+  - **Subscription / Resource Group** – your Azure subscription
+  - **Messaging endpoint** – `https://<your-domain>/api/messages` (public URL)
+  - **Microsoft App** – choose "Create new Microsoft App ID"
+- After creation, go to **Configuration** → note down **Microsoft App ID**
+- Click **Manage Password** → **New client secret** → copy the secret value
+
+> You can also create the bot registration with the **Teams App Studio** or the **Developer Portal for Teams** if you prefer a UI-only workflow.
+
+**2. Add the Teams channel**
+
+- In your Azure Bot resource → **Channels** → click the **Microsoft Teams** icon → Save
+
+**3. Get your Teams user ID**
+
+Your `allowFrom` entries are **Azure AD Object IDs** (GUIDs).  
+Find yours:
+- Teams → click your avatar → **Settings** → look for the ID in nanobot logs when you first message the bot
+- Or: Azure AD → Users → your account → **Object ID**
+
+**4. Configure nanobot**
+
+```json
+{
+  "channels": {
+    "teams": {
+      "enabled": true,
+      "appId": "YOUR_MICROSOFT_APP_ID",
+      "appPassword": "YOUR_CLIENT_SECRET",
+      "host": "0.0.0.0",
+      "port": 3978,
+      "webhookPath": "/api/messages",
+      "allowFrom": ["AAD_OBJECT_ID_OF_ALLOWED_USER"],
+      "groupPolicy": "mention"
+    }
+  }
+}
+```
+
+**5. Run**
+
+```bash
+nanobot gateway
+```
+
+> [!TIP]
+> For local development use [ngrok](https://ngrok.com) or [Dev Tunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/overview)
+> to expose your local port to Teams:
+> ```bash
+> ngrok http 3978
+> # Use the https://xxx.ngrok.io/api/messages URL in the Azure Bot messaging endpoint
+> ```
+
+---
+
+#### Security options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `allowFrom` | `list[str]` | AAD Object IDs (or `["*"]` for everyone). Empty = deny all. |
+| `allowTenants` | `list[str]` | Restrict to specific Azure AD tenant IDs. Empty = any tenant. |
+| `groupPolicy` | `string` | `"mention"` *(default)* · `"open"` · `"allowlist"` |
+| `groupAllowFrom` | `list[str]` | Conversation IDs allowed when `groupPolicy = "allowlist"`. |
+| `dm.enabled` | `bool` | Allow 1-to-1 chats (default `true`). |
+| `dm.policy` | `string` | `"open"` *(default)* · `"allowlist"` |
+| `dm.allowFrom` | `list[str]` | Per-DM allowlist (falls back to top-level `allowFrom`). |
+
+**Access control is applied in three layers:**
+
+1. **Tenant gate** – `allowTenants` filters by Azure AD organisation
+2. **Conversation policy** – DM vs. group rules + `@mention` requirement
+3. **User allowlist** – global `allowFrom` (empty list = deny all)
+
+**Minimal locked-down config (single user, DMs only)**
+
+```json
+{
+  "channels": {
+    "teams": {
+      "enabled": true,
+      "appId": "YOUR_APP_ID",
+      "appPassword": "YOUR_SECRET",
+      "allowFrom": ["YOUR_AAD_OBJECT_ID"],
+      "allowTenants": ["YOUR_TENANT_ID"],
+      "dm": { "enabled": true, "policy": "allowlist", "allowFrom": ["YOUR_AAD_OBJECT_ID"] },
+      "groupPolicy": "allowlist",
+      "groupAllowFrom": []
+    }
+  }
+}
 ```
 
 </details>
