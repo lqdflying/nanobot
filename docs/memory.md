@@ -28,6 +28,13 @@ Memory moves through nanobot in two stages.
 When a conversation grows large enough to pressure the context window, nanobot does not try to carry every old message forever.
 
 Instead, the `Consolidator` summarizes the oldest safe slice of the conversation and appends that summary to `memory/history.jsonl`.
+Chunk sizing is driven purely by token budget via `pick_consolidation_boundary`. The old 60-message hard cap per consolidation round (`_cap_consolidation_boundary`) is gone.
+
+`archive()` truncates input text to the consolidation LLM's token budget before sending, via `_truncate_to_token_budget` using tiktoken.
+
+`raw_archive()` caps its output at 16,000 characters (`_RAW_ARCHIVE_MAX_CHARS = 16_000`).
+
+After `archive()`, `session.last_consolidated` is advanced regardless of whether the entry was summarized or raw-archived.
 
 This file is:
 
@@ -56,7 +63,7 @@ Dream reads:
 
 Then it works in two phases:
 
-1. It studies what is new and what is already known.
+1. It studies what is new and what is already known. During Phase 1, `SOUL.md`, `USER.md`, `memory/MEMORY.md`, and each history entry are truncated before injection to stay within the prompt budget.
 2. It edits the long-term files surgically, not by rewriting everything, but by making the smallest honest change that keeps memory coherent.
 
 This is why nanobot's memory is not just archival. It is interpretive.
@@ -125,6 +132,20 @@ Memory is not hidden behind the curtain. Users can inspect and guide it.
 | `/dream-restore <sha>` | Restore memory to the state before a specific change |
 
 These commands exist for a reason: automatic memory is powerful, but users should always retain the right to inspect, understand, and restore it.
+
+## Size Limits
+
+Several hard constants guard memory from runaway growth:
+
+| Constant | Value | What it controls |
+|----------|-------|------------------|
+| `_RAW_ARCHIVE_MAX_CHARS` | 16,000 | Cap on `raw_archive()` entries written to `history.jsonl` |
+| `_ARCHIVE_SUMMARY_MAX_CHARS` | 8,000 | Cap on LLM-produced summaries before writing to `history.jsonl` |
+| `_HISTORY_ENTRY_HARD_CAP` | 64,000 | Hard cap default in `append_history()` (belt-and-suspenders) |
+| System prompt "Recent History" | 32,000 chars | `build_system_prompt()` caps this section before injection |
+
+These limits are not suggestions. They are the fences that keep memory from consuming the very context it is meant to augment.
+
 
 ## Versioned Memory
 
