@@ -34,7 +34,8 @@ Connect nanobot to your favorite chat platform. Want to build your own? See the 
     "telegram": {
       "enabled": true,
       "token": "YOUR_BOT_TOKEN",
-      "allowFrom": ["YOUR_USER_ID"]
+      "allowFrom": ["YOUR_USER_ID"],
+      "inline_keyboards": true
     }
   }
 }
@@ -45,6 +46,32 @@ Connect nanobot to your favorite chat platform. Want to build your own? See the 
 
 
 **3. Run**
+
+```bash
+nanobot gateway
+```
+
+**4. Inline Keyboard Buttons**
+
+When `inline_keyboards: true`, nanobot can attach inline keyboard buttons to messages. These are shown as tappable buttons below the message text. When a user taps a button, its prefix is sent back as a regular message — nanobot's agent understands the prefix and responds accordingly.
+
+The agent can request buttons by including a `buttons` field in the `OutboundMessage`:
+
+```python
+OutboundMessage(
+    content="Choose an option:",
+    buttons=[
+        ["Option A", "Option B"],
+        ["Option C"],
+    ]
+)
+```
+
+Display labels can be up to 200 characters. If a label exceeds Telegram's 64-byte UTF-8 callback_data limit, the wire value is truncated at a UTF-8 character boundary — the full label is still shown to the user, and the tapped prefix echoes back to nanobot as the user message.
+
+When `inline_keyboards: false` (default), long option labels fall back to plain inline text and the bot responds to the full label naturally.
+
+**5. Run**
 
 ```bash
 nanobot gateway
